@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ImpSci Navigator: ED-LEAD Site Planner</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- D3.js -->
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        msk: { 
+                            blue: '#007CBA', 
+                            darkblue: '#005587', 
+                            navy: '#1D252D', 
+                            orange: '#F26522', 
+                            light: '#E6F2F8'
+                        },
+                        slate: {
+                            50: '#F8FAFC',
+                            100: '#F1F5F9',
+                            200: '#E2E8F0',
+                            300: '#CBD5E1',
+                            400: '#94A3B8',
+                            500: '#64748B',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1E293B',
+                            900: '#0F172A',
+                        }
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)',
+                        'card': '0 0 0 1px rgba(0,0,0,0.03), 0 2px 8px rgba(0,0,0,0.04)',
+                        'float': '0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025)'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+        
+        /* Custom Range Slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #007CBA;
+            border: 2px solid #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            margin-top: -6px;
+            cursor: grab;
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.1); }
+        input[type=range]::-webkit-slider-thumb:active { cursor: grabbing; }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #E2E8F0;
+            border-radius: 2px;
+        }
+
+        /* Animations */
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease, transform 0.3s ease; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(10px); }
+        
+        /* Tooltip */
+        .tooltip {
+            position: relative; 
+            display: inline-flex;
+        }
+        .tooltip .tooltip-content {
+            visibility: hidden;
+            width: 200px;
+            background-color: #1E293B;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 8px;
+            position: absolute;
+            z-index: 50;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.2s;
+            font-size: 0.75rem;
+            line-height: 1.4;
+            pointer-events: none;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .tooltip .tooltip-content::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #1E293B transparent transparent transparent;
+        }
+        .tooltip:hover .tooltip-content {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Print Styles */
+        @media print {
+            body { background: white; }
+            header, .no-print { display: none !important; }
+            .print-only-visible { display: block !important; }
+            .shadow-msk, .shadow-card, .shadow-float { box-shadow: none !important; border: 1px solid #ccc; }
+            .page-break { page-break-before: always; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased h-full flex flex-col font-sans" x-data="impSciApp" x-cloak @keydown.escape="closeAllModals()">
+
+    <!-- HEADER -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-soft">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <!-- Brand -->
+                <div class="flex items-center gap-3">
+                    <div class="bg-gradient-to-br from-msk-blue to-msk-darkblue text-white w-10 h-10 rounded-lg shadow-sm flex items-center justify-center">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    </div>
+                    <div class="leading-tight">
+                        <h1 class="font-bold text-lg text-msk-navy tracking-tight">ImpSci Navigator</h1>
+                        <p class="text-[11px] text-slate-500 font-medium uppercase tracking-wider">ED-LEAD Planning Tool</p>
+                    </div>
+                </div>
+                
+                <!-- Progress & Actions -->
+                <div class="flex items-center gap-6">
+                    <div class="hidden md:flex flex-col items-end w-40">
+                        <div class="flex justify-between w-full mb-1">
+                            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Plan Completeness</span>
+                            <span class="text-[10px] font-bold text-msk-blue" x-text="progress + '%'"></span>
+                        </div>
+                        <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div class="h-full bg-msk-blue transition-all duration-1000 ease-out" :style="`width: ${progress}%`"></div>
+                        </div>
+                    </div>
+                    <button @click="downloadJSON()" class="group relative inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:text-msk-blue hover:border-msk-blue transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-msk-blue">
+                        <svg class="w-4 h-4 mr-2 text-slate-400 group-hover:text-msk-blue transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Export
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Stepper Navigation -->
+            <nav class="flex -mb-px overflow-x-auto no-scrollbar space-x-1 sm:space-x-8" aria-label="Tabs">
+                <template x-for="(phase, index) in phases" :key="phase.id">
+                    <button 
+                        @click="currentPhase = phase.id"
+                        :class="currentPhase === phase.id ? 'border-msk-blue text-msk-blue' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'"
+                        class="group inline-flex items-center py-4 px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-colors duration-200">
+                        <div class="flex items-center justify-center w-6 h-6 rounded-full mr-2 text-[10px] font-bold transition-colors"
+                             :class="currentPhase === phase.id ? 'bg-msk-blue text-white' : (isPhaseComplete(phase.id) ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500')">
+                             <span x-show="!isPhaseComplete(phase.id)" x-text="index + 1"></span>
+                             <svg x-show="isPhaseComplete(phase.id)" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+                        </div>
+                        <span x-text="phase.label"></span>
+                    </button>
+                </template>
+            </nav>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+
+        <!-- PHASE 1: EXPLORATION -->
+        <div x-show="currentPhase === 'exploration'" x-transition:enter="fade-enter-active" x-transition:enter-start="fade-enter-from" class="space-y-6">
+            
+            <!-- Header Card -->
+            <div class="bg-white rounded-xl shadow-card border border-slate-200 p-6">
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <span class="w-1 h-6 bg-msk-blue rounded-full"></span>
+                            Site Configuration
+                        </h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Site Name</label>
+                                <input type="text" x-model="project.name" class="block w-full rounded-lg border-slate-300 shadow-sm focus:border-msk-blue focus:ring-msk-blue sm:text-sm py-2 px-3 transition duration-150 ease-in-out" placeholder="e.g. Memorial Hospital ED">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Implementation Arm</label>
+                                <div class="flex flex-wrap gap-2">
+                                    <template x-for="arm in availableArms" :key="arm.id">
+                                        <label class="cursor-pointer group">
+                                            <input type="checkbox" :value="arm.id" x-model="project.arms" @change="updateCoreComponentsFromArms" class="peer sr-only">
+                                            <div class="px-3 py-1.5 rounded-md border border-slate-200 bg-slate-50 text-slate-600 text-xs font-medium transition-all peer-checked:bg-msk-light peer-checked:text-msk-darkblue peer-checked:border-msk-blue group-hover:bg-white shadow-sm">
+                                                <span x-text="arm.label"></span>
+                                            </div>
+                                        </label>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                         <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Context Description</label>
+                         <textarea x-model="project.description" rows="6" class="block w-full rounded-lg border-slate-300 shadow-sm focus:border-msk-blue focus:ring-msk-blue sm:text-sm py-2 px-3 transition duration-150 ease-in-out resize-none bg-slate-50 focus:bg-white" placeholder="Describe ED volume, demographics, and key challenges..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                <!-- Left: Core Components -->
+                <div class="lg:col-span-4 flex flex-col gap-6">
+                      <div class="bg-white rounded-xl shadow-card border border-slate-200 flex flex-col">
+                        <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <h3 class="font-bold text-slate-700 text-sm">Core Components</h3>
+                            <button @click="showFidelityModal = true" class="text-xs text-msk-blue font-semibold hover:text-msk-darkblue transition-colors">Edit Plan</button>
+                        </div>
+                        <div class="p-4 space-y-3 bg-slate-50/30">
+                            <template x-for="comp in project.coreComponents" :key="comp.name">
+                                <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 group">
+                                    <div class="flex justify-between items-start mb-1">
+                                        <div class="font-semibold text-sm text-slate-800" x-text="comp.name"></div>
+                                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 group-hover:bg-msk-light group-hover:text-msk-blue transition-colors" x-text="comp.dimension"></span>
+                                    </div>
+                                    <div class="text-xs text-slate-500 mb-2" x-text="comp.func"></div>
+                                    <div class="flex items-center gap-2 text-[10px] text-slate-400 font-medium">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                                        <span x-text="comp.measurement"></span>
+                                        <span class="text-emerald-600 font-bold ml-auto" x-text="comp.threshold"></span>
+                                    </div>
+                                </div>
+                            </template>
+                            <div x-show="project.coreComponents.length === 0" class="flex flex-col items-center justify-center h-40 text-slate-400 text-sm">
+                                <svg class="w-8 h-8 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                                Select an arm to load components
+                            </div>
+                        </div>
+                      </div>
+                </div>
+
+                <!-- Center: Planning -->
+                <div class="lg:col-span-4 flex flex-col gap-6">
+                    <div class="bg-white rounded-xl shadow-card border border-slate-200 p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="font-bold text-slate-700 text-sm">Implementation Team</h3>
+                            <button @click="addTeamMember" class="w-6 h-6 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-msk-blue hover:border-msk-blue transition-colors">+</button>
+                        </div>
+                        <div class="space-y-3 mb-8">
+                            <template x-for="(member, index) in project.team" :key="index">
+                                <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 transition-colors group">
+                                    <div class="w-8 h-8 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 text-slate-600 flex items-center justify-center font-bold text-xs shadow-inner" x-text="member.name ? member.name.charAt(0).toUpperCase() : '?'"></div>
+                                    <div class="flex-1 min-w-0">
+                                        <input type="text" x-model="member.name" class="w-full bg-transparent border-none p-0 text-sm font-semibold text-slate-700 focus:ring-0 placeholder-slate-300 truncate" placeholder="Name">
+                                        <input type="text" x-model="member.role" class="w-full bg-transparent border-none p-0 text-xs text-slate-500 focus:ring-0 placeholder-slate-300 truncate" placeholder="Role">
+                                    </div>
+                                    <button @click="removeTeamMember(index)" class="text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">&times;</button>
+                                </div>
+                            </template>
+                        </div>
+
+                        <div class="border-t border-slate-100 pt-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="font-bold text-slate-700 text-sm">Timeline</h3>
+                                <button @click="addTimelineItem" class="w-6 h-6 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-msk-blue hover:border-msk-blue transition-colors">+</button>
+                            </div>
+                            <div class="space-y-0 relative before:absolute before:inset-y-0 before:left-3.5 before:w-0.5 before:bg-slate-100">
+                                <template x-for="(item, index) in project.timeline" :key="index">
+                                    <div class="relative pl-8 pb-4 group last:pb-0">
+                                        <div class="absolute left-2 top-1.5 w-3.5 h-3.5 rounded-full border-2 border-white shadow-sm z-10 bg-msk-blue"></div>
+                                        <div class="flex flex-col">
+                                            <input type="text" x-model="item.desc" class="w-full bg-transparent border-none p-0 text-sm font-medium text-slate-700 focus:ring-0 placeholder-slate-400" placeholder="Milestone">
+                                            <div class="flex items-center gap-2 mt-0.5">
+                                                <input type="date" x-model="item.date" class="bg-transparent border-none p-0 text-[10px] text-slate-400 focus:ring-0 w-24">
+                                                <button @click="removeTimelineItem(index)" class="text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 text-xs transition-opacity">&times;</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Readiness Assessment -->
+                <div class="lg:col-span-4">
+                    <div class="bg-white rounded-xl shadow-card border border-slate-200 p-6 sticky top-24">
+                        <h3 class="font-bold text-slate-700 text-sm mb-6 text-center">Readiness Assessment</h3>
+                        
+                        <!-- Gauge -->
+                        <div class="relative w-40 h-40 mx-auto mb-6 flex items-center justify-center">
+                            <svg class="w-full h-full transform -rotate-90">
+                                <circle cx="80" cy="80" r="70" stroke="currentColor" stroke-width="12" fill="transparent" class="text-slate-100" />
+                                <circle cx="80" cy="80" r="70" stroke="currentColor" stroke-width="12" fill="transparent" 
+                                        :class="readinessColorClass"
+                                        class="transition-all duration-1000 ease-out"
+                                        :stroke-dasharray="440" 
+                                        :stroke-dashoffset="440 - (440 * readinessScore / 100)"
+                                        stroke-linecap="round" />
+                            </svg>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                <span class="text-3xl font-black text-slate-800" x-text="readinessScore + '%'"></span>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Site Readiness</span>
+                            </div>
+                        </div>
+
+                        <!-- Sliders -->
+                        <div class="space-y-5">
+                            <template x-for="metric in readinessMetrics" :key="metric.id">
+                                <div class="group">
+                                    <div class="flex justify-between items-end mb-2">
+                                        <label class="text-xs font-semibold text-slate-600 flex items-center gap-1.5 cursor-help tooltip">
+                                            <span x-text="metric.label"></span>
+                                            <svg class="w-3 h-3 text-slate-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+                                            <span class="tooltip-content" x-text="metric.help"></span>
+                                        </label>
+                                        <span class="text-[10px] font-bold text-msk-blue bg-blue-50 px-1.5 py-0.5 rounded" x-text="project[metric.model] > 0 ? project[metric.model] + '/5' : 'Unrated'"></span>
+                                    </div>
+                                    <input type="range" min="0" max="5" step="0.5" x-model="project[metric.model]" class="w-full">
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- PHASE 2: PREPARATION (Matrix) -->
+        <div x-show="currentPhase === 'preparation'" x-transition:enter="fade-enter-active" x-transition:enter-start="fade-enter-from" class="space-y-6" x-cloak>
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                <!-- Left: Controls -->
+                <div class="lg:col-span-3 flex flex-col bg-white rounded-xl shadow-card border border-slate-200 h-full">
+                    <div class="p-4 border-b border-slate-100 bg-slate-50">
+                        <h3 class="font-bold text-slate-700 text-xs uppercase tracking-wide flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-msk-blue text-white flex items-center justify-center font-bold">1</span>
+                            Scan Context
+                        </h3>
+                    </div>
+                    
+                    <div class="p-4 space-y-4 border-b border-slate-100">
+                         <!-- Construct -->
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">CFIR Domain</label>
+                            <select x-model="newBarrier.construct" class="block w-full rounded-md border-slate-300 shadow-sm focus:border-msk-blue focus:ring-msk-blue text-xs py-2 px-3">
+                                <option value="">Select Domain...</option>
+                                <optgroup label="Inner Setting">
+                                    <option value="culture">Culture (Values/Norms)</option>
+                                    <option value="readiness">Readiness (Capacity)</option>
+                                    <option value="resources">Resources (Space/Time)</option>
+                                    <option value="efficacy">Self-Efficacy</option>
+                                </optgroup>
+                                <optgroup label="Outer Setting">
+                                    <option value="needs">Patient Needs</option>
+                                    <option value="policy">Policy & Incentives</option>
+                                </optgroup>
+                                <optgroup label="Individuals">
+                                    <option value="knowledge">Knowledge/Beliefs</option>
+                                </optgroup>
+                            </select>
+                        </div>
+
+                         <!-- Impact Slider -->
+                        <div>
+                            <div class="flex justify-between text-[10px] font-bold mb-1">
+                                <span class="text-red-500">Barrier</span>
+                                <span class="text-emerald-500">Enabler</span>
+                            </div>
+                            <input type="range" x-model="newBarrier.rating" min="-2" max="2" step="1" class="w-full h-2 bg-gradient-to-r from-red-100 via-slate-100 to-emerald-100 rounded-lg appearance-none cursor-pointer">
+                            <div class="text-center text-[10px] font-bold text-slate-500 mt-1" x-text="newBarrier.rating < 0 ? 'Negative Impact' : (newBarrier.rating > 0 ? 'Positive Impact' : 'Neutral')"></div>
+                        </div>
+
+                        <!-- Factor Name -->
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Specific Condition</label>
+                            <textarea x-model="newBarrier.desc" rows="2" class="block w-full rounded-md border-slate-300 shadow-sm focus:border-msk-blue focus:ring-msk-blue text-xs py-2 px-3 resize-none" placeholder="Describe specific issue (e.g. High nurse turnover)"></textarea>
+                        </div>
+
+                        <!-- Prioritization -->
+                        <div class="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-2">Prioritization</label>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <span class="block text-[9px] text-slate-500 mb-1">Importance</span>
+                                    <input type="number" x-model="newBarrier.importance" class="w-full text-xs border-slate-200 rounded p-1 text-center" min="0" max="100">
+                                </div>
+                                <div>
+                                    <span class="block text-[9px] text-slate-500 mb-1">Changeability</span>
+                                    <input type="number" x-model="newBarrier.changeability" class="w-full text-xs border-slate-200 rounded p-1 text-center" min="0" max="100">
+                                </div>
+                            </div>
+                        </div>
+
+                        <button @click="addBarrier()" :disabled="!newBarrier.desc || !newBarrier.construct" class="w-full bg-msk-blue text-white py-2 rounded-md text-xs font-bold shadow-sm hover:bg-msk-darkblue transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            Add to Matrix
+                        </button>
+                    </div>
+
+                    <div class="flex-1 p-2 space-y-1 bg-slate-50 overflow-y-auto max-h-[300px]">
+                        <h4 class="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase">Identified Factors</h4>
+                        <template x-for="(b, i) in sortedDeterminants" :key="i">
+                            <div class="flex justify-between items-center p-2 rounded bg-white border border-slate-200 shadow-sm hover:border-msk-blue cursor-pointer transition-colors group" @click="highlightBarrier(b.id)">
+                                <div class="flex items-center gap-2 overflow-hidden">
+                                    <div class="w-2 h-2 rounded-full flex-shrink-0" :class="parseInt(b.rating) < 0 ? 'bg-red-500' : 'bg-emerald-500'"></div>
+                                    <div class="flex flex-col truncate">
+                                        <span class="text-xs font-medium text-slate-700 truncate" x-text="b.desc"></span>
+                                        <span class="text-[9px] text-slate-400" x-text="b.construct"></span>
+                                    </div>
+                                </div>
+                                <button @click.stop="removeBarrier(i)" class="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">&times;</button>
+                            </div>
+                        </template>
+                        <div x-show="project.determinants.length === 0" class="text-center py-4 text-xs text-slate-400 italic">No determinants added yet.</div>
+                    </div>
+                </div>
+
+                <!-- Center: Matrix Visualization -->
+                <div class="lg:col-span-6 flex flex-col h-full">
+                    <!-- Title moved OUT of the chart container to prevent overlap -->
+                    <div class="bg-white border border-b-0 border-slate-200 rounded-t-xl p-4 flex justify-between items-center">
+                        <div>
+                            <h2 class="font-bold text-slate-700 text-xs uppercase tracking-wide flex items-center gap-2">
+                                <span class="w-6 h-6 rounded-full bg-msk-blue text-white flex items-center justify-center font-bold">2</span>
+                                Prioritize (Matrix)
+                            </h2>
+                        </div>
+                        <div class="text-[10px] text-slate-400 font-medium bg-slate-50 px-2 py-1 rounded">Drag nodes to adjust</div>
+                    </div>
+                    
+                    <div class="bg-white rounded-b-xl shadow-card border border-slate-200 flex-1 relative overflow-hidden h-[600px]">
+                        <div id="barrier-matrix" class="w-full h-full bg-slate-50 cursor-crosshair"></div>
+                    </div>
+                </div>
+
+                <!-- Right: Strategies -->
+                <div class="lg:col-span-3 flex flex-col bg-white rounded-xl shadow-card border border-slate-200 h-full">
+                    <div class="p-4 border-b border-slate-100 bg-slate-50">
+                        <h3 class="font-bold text-slate-700 text-xs uppercase tracking-wide flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-msk-blue text-white flex items-center justify-center font-bold">3</span>
+                            Select Strategies
+                        </h3>
+                    </div>
+                    
+                    <!-- Suggested Strategies (AI) -->
+                    <div class="p-4 border-b border-slate-100 bg-sky-50/50">
+                        <h4 class="text-[10px] font-bold text-msk-blue uppercase mb-2 flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                            Recommended for your Context
+                        </h4>
+                        <div class="space-y-2 max-h-[200px] overflow-y-auto">
+                            <template x-for="strat in suggestedStrategies" :key="strat">
+                                <div class="w-full text-left text-xs bg-white border border-sky-100 text-slate-700 p-2 rounded shadow-sm hover:border-msk-blue transition-all flex justify-between items-center group cursor-pointer" @click="showStrategyDesc(strat)">
+                                    <span x-text="strat" class="truncate pr-2"></span>
+                                    <button @click.stop="addStrategy(strat)" class="w-5 h-5 flex items-center justify-center rounded-full hover:bg-msk-blue hover:text-white text-msk-blue font-bold opacity-50 group-hover:opacity-100 transition-all">+</button>
+                                </div>
+                            </template>
+                            <div x-show="suggestedStrategies.length === 0" class="text-[10px] text-slate-400 italic text-center py-2">
+                                Add determinants to see matching ERIC strategies.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Manual Add -->
+                    <div class="p-4 border-b border-slate-100">
+                        <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Manual Selection</label>
+                        <select @change="addStrategy($event.target.value); $event.target.value=''" class="block w-full rounded-md border-slate-300 shadow-sm focus:border-msk-blue focus:ring-msk-blue text-xs py-2 px-3">
+                            <option value="">+ Add Other Strategy...</option>
+                            <option value="Educational Meetings">Educational Meetings</option>
+                            <option value="Audit and Feedback">Audit and Feedback</option>
+                            <option value="Local Opinion Leaders">Identify Champions</option>
+                            <option value="Tailor Strategies">Tailor to Context</option>
+                            <option value="Promote Adaptability">Promote Adaptability</option>
+                            <option value="Assess Readiness">Assess Readiness</option>
+                            <option value="Build Coalition">Build a Coalition</option>
+                        </select>
+                    </div>
+
+                    <!-- Selected List -->
+                    <div class="flex-1 p-2 space-y-2 bg-slate-50 overflow-y-auto">
+                         <h4 class="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase">Selected Plan</h4>
+                         <template x-for="(strat, i) in project.strategies" :key="i">
+                            <div class="bg-blue-50 border border-blue-100 rounded-md p-2 flex justify-between items-center group">
+                                <span class="text-xs text-msk-darkblue font-medium" x-text="strat.name"></span>
+                                <button @click="removeStrategy(i)" class="text-blue-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">&times;</button>
+                            </div>
+                        </template>
+                        <div x-show="project.strategies.length === 0" class="flex flex-col items-center justify-center h-20 text-center px-4">
+                            <p class="text-xs text-slate-400 italic">No strategies selected yet.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PHASE 3: IMPLEMENTATION (Redesigned) -->
+        <div x-show="currentPhase === 'implementation'" class="space-y-6" x-cloak>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                
+                <!-- Fidelity Plan & Monitor (Left 8 Cols) -->
+                <div class="lg:col-span-7 space-y-6">
+                    <div class="bg-white rounded-xl shadow-card border border-slate-200 flex flex-col">
+                        <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                             <div>
+                                <h2 class="text-lg font-bold text-msk-navy flex items-center gap-2">
+                                    <span class="w-1.5 h-6 bg-emerald-500 rounded-full"></span>
+                                    Fidelity Plan & Monitor
+                                </h2>
+                                <p class="text-xs text-slate-500 mt-0.5 ml-3.5">Track adherence to core components over time.</p>
+                             </div>
+                             <div class="flex gap-2">
+                                <button @click="showFidelityModal = true" class="text-xs font-bold text-slate-500 hover:text-msk-blue px-3 py-1.5 bg-white border border-slate-200 rounded shadow-sm">Edit Protocol</button>
+                                <button @click="logFidelitySession" class="bg-emerald-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-emerald-700 transition shadow-sm flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                    Log Session
+                                </button>
+                             </div>
+                        </div>
+
+                        <!-- Protocol View -->
+                        <div class="p-6">
+                            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Protocol Definition</h3>
+                            <div class="overflow-x-auto border border-slate-200 rounded-lg">
+                                <table class="min-w-full text-left text-xs">
+                                    <thead class="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                        <tr>
+                                            <th class="px-4 py-2">Component</th>
+                                            <th class="px-4 py-2">Measure</th>
+                                            <th class="px-4 py-2">Benchmark</th>
+                                            <th class="px-4 py-2">Dimension</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        <template x-for="comp in project.coreComponents" :key="comp.name">
+                                            <tr class="hover:bg-slate-50/50">
+                                                <td class="px-4 py-2 font-medium text-slate-800" x-text="comp.name"></td>
+                                                <td class="px-4 py-2 text-slate-500" x-text="comp.measurement || 'Not defined'"></td>
+                                                <td class="px-4 py-2 text-emerald-600 font-bold" x-text="comp.threshold || '-'"></td>
+                                                <td class="px-4 py-2"><span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium text-[10px]" x-text="comp.dimension"></span></td>
+                                            </tr>
+                                        </template>
+                                        <tr x-show="project.coreComponents.length === 0"><td colspan="4" class="px-4 py-8 text-center text-slate-400">No components defined yet.</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Performance Dashboard -->
+                        <div class="p-6 pt-0">
+                             <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-3">Performance Trends</h3>
+                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <template x-for="comp in project.coreComponents" :key="comp.name">
+                                    <div class="p-4 rounded-lg border border-slate-100 bg-slate-50/50 hover:bg-white hover:shadow-sm transition-all">
+                                        <div class="flex justify-between items-start mb-3">
+                                            <div>
+                                                <div class="text-sm font-bold text-slate-700" x-text="comp.name"></div>
+                                                <div class="text-[10px] text-slate-500" x-text="comp.measurement"></div>
+                                            </div>
+                                            <div class="text-right">
+                                                <div class="text-xs font-bold text-msk-blue" x-text="getLatestObserved(comp.name)"></div>
+                                                <div class="text-[9px] text-slate-400">Target: <span x-text="comp.threshold"></span></div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Adherence Bar (Qualitative Score) -->
+                                        <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden mb-1">
+                                            <div class="bg-msk-blue h-1.5 rounded-full transition-all duration-500" :style="`width: ${(getLatestCompScore(comp.name)/5)*100}%`"></div>
+                                        </div>
+                                        <div class="flex justify-between text-[9px] text-slate-400">
+                                            <span>Qualitative Rating: <span x-text="getLatestCompScore(comp.name)"></span>/5</span>
+                                            <span>Last Update</span>
+                                        </div>
+                                    </div>
+                                </template>
+                             </div>
+                             <div x-show="!project.fidelityHistory || project.fidelityHistory.length === 0" class="text-center py-8 text-sm text-slate-400 italic bg-slate-50 rounded-lg mt-2 border border-dashed border-slate-200">
+                                 No sessions logged yet. Log a session to see performance data.
+                             </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Adaptation Log (Right 5 Cols) -->
+                <div class="lg:col-span-5">
+                    <div class="bg-white rounded-xl shadow-card border border-slate-200 flex flex-col">
+                         <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <div>
+                                <h2 class="text-lg font-bold text-msk-navy flex items-center gap-2">
+                                    <span class="w-1.5 h-6 bg-amber-400 rounded-full"></span>
+                                    Adaptation Log
+                                </h2>
+                                <p class="text-xs text-slate-500 mt-0.5 ml-3.5">Document modifications using FRAME.</p>
+                            </div>
+                            <button @click="showAdaptationModal = true" class="text-xs font-bold text-msk-blue hover:text-msk-darkblue bg-blue-50 px-3 py-1.5 rounded-md hover:bg-blue-100 transition-colors">+ Log Change</button>
+                        </div>
+                        
+                        <div class="p-6 bg-white">
+                            <div class="relative pl-4 border-l-2 border-slate-100 space-y-8">
+                                <template x-for="log in project.adaptations" :key="log.id">
+                                    <div class="relative pl-6">
+                                        <!-- Timeline Dot -->
+                                        <div class="absolute -left-[21px] top-1.5 w-3 h-3 rounded-full border-2 border-white ring-1"
+                                             :class="{'ring-amber-400 bg-amber-400': log.nature === 'Tailoring', 'ring-emerald-400 bg-emerald-400': log.nature === 'Adding', 'ring-red-400 bg-red-400': log.nature === 'Removing'}"></div>
+                                        
+                                        <div class="bg-slate-50 rounded-lg border border-slate-200 p-3 hover:shadow-md transition-shadow">
+                                            <div class="flex justify-between items-start mb-1">
+                                                <span class="text-[10px] font-bold text-slate-400 uppercase" x-text="log.date"></span>
+                                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border"
+                                                      :class="{'bg-amber-50 text-amber-700 border-amber-200': log.nature === 'Tailoring', 'bg-emerald-50 text-emerald-700 border-emerald-200': log.nature === 'Adding', 'bg-red-50 text-red-700 border-red-200': log.nature === 'Removing'}"
+                                                      x-text="log.nature"></span>
+                                            </div>
+                                            <h4 class="text-sm font-bold text-slate-800 mb-1" x-text="log.what"></h4>
+                                            <p class="text-xs text-slate-600 leading-relaxed" x-text="log.reason"></p>
+                                        </div>
+                                    </div>
+                                </template>
+                                
+                                <div x-show="project.adaptations.length === 0" class="relative pl-6">
+                                    <div class="absolute -left-[21px] top-1.5 w-3 h-3 rounded-full bg-slate-200 border-2 border-white"></div>
+                                    <div class="text-sm text-slate-400 italic">No adaptations recorded. Use the button above to log protocol deviations.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PHASE 4: SUSTAINMENT -->
+        <div x-show="currentPhase === 'sustainment'" class="bg-white rounded-xl shadow-card border border-slate-200 p-6" x-cloak>
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 pb-4 border-b border-slate-100">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-800">Sustainability Monitor (PSAT)</h2>
+                    <p class="text-xs text-slate-500">Assess capacity for long-term sustainment</p>
+                </div>
+                <div class="flex items-center gap-3 mt-4 md:mt-0 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                    <span class="text-xs font-bold text-slate-500 uppercase">Current Score</span>
+                    <span class="text-2xl font-black text-msk-blue" x-text="psatAverage"></span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                <!-- Assessment Form -->
+                <div class="space-y-6">
+                    <div class="flex gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <input type="text" x-model="psatAssessor" placeholder="Assessor Name" class="block w-full bg-white border-slate-300 rounded-md text-sm shadow-sm focus:border-msk-blue focus:ring-msk-blue">
+                        <button @click="logPsatAssessment" class="bg-msk-blue text-white px-4 rounded-md text-xs font-bold hover:bg-msk-darkblue transition">Log</button>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <template x-for="(score, domain) in project.psatScores" :key="domain">
+                            <div>
+                                <div class="flex justify-between mb-1 items-end">
+                                    <label class="text-xs font-bold text-slate-600 tracking-wide mb-1 block w-3/4 leading-snug" x-text="psatQuestions[domain]"></label>
+                                    <span class="text-xs font-bold text-msk-blue w-6 text-right mb-1" x-text="score > 0 ? score : '-'"></span>
+                                </div>
+                                <input type="range" min="0" max="7" step="1" x-model="project.psatScores[domain]" @input="renderPsatChart" class="w-full">
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Visualization -->
+                <div class="flex flex-col h-full">
+                    <div class="flex-1 relative min-h-[300px] flex items-center justify-center bg-white">
+                        <canvas id="psatRadarChart"></canvas>
+                    </div>
+                    
+                    <div class="mt-6 border-t border-slate-100 pt-4">
+                        <h4 class="text-xs font-bold text-slate-400 uppercase mb-3">Assessment History</h4>
+                        <div class="space-y-2 pr-2">
+                             <template x-for="log in project.psatHistory" :key="log.date">
+                                <div class="flex justify-between text-xs py-2 border-b border-slate-50 last:border-0">
+                                    <span class="text-slate-500" x-text="log.date"></span>
+                                    <span class="font-medium text-slate-700" x-text="log.assessor"></span>
+                                    <span class="font-bold text-msk-blue" x-text="log.average"></span>
+                                </div>
+                            </template>
+                            <div x-show="project.psatHistory.length === 0" class="text-xs text-slate-400 italic">No history yet.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BLUEPRINT REPORT -->
+        <div x-show="currentPhase === 'dashboard'" class="bg-white p-10 rounded-xl shadow-card border border-slate-200 print-only-visible max-w-5xl mx-auto" x-cloak>
+             <div class="flex justify-between items-start mb-8 border-b-2 border-slate-800 pb-6">
+                <div>
+                    <h2 class="text-3xl font-black text-slate-900 uppercase tracking-tight">Implementation Blueprint</h2>
+                    <p class="text-lg text-slate-600 mt-2 font-light" x-text="project.name || 'Site Name Not Set'"></p>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm font-bold text-slate-400 uppercase">Generated On</div>
+                    <div class="text-sm font-medium text-slate-800" x-text="new Date().toLocaleDateString()"></div>
+                    <button @click="window.print()" class="no-print mt-4 text-xs font-bold text-white bg-slate-900 px-4 py-2 rounded shadow hover:bg-slate-700 transition-colors">Print Blueprint</button>
+                </div>
+            </div>
+
+            <!-- Section 1: Context & Challenge -->
+            <div class="mb-10">
+                <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">1. The Challenge (Context & Barriers)</h3>
+                <div class="grid grid-cols-3 gap-8">
+                    <div class="col-span-2">
+                        <p class="text-sm text-slate-600 mb-4 italic" x-text="project.description || 'No context description provided.'"></p>
+                        <h4 class="text-xs font-bold text-slate-500 uppercase mb-2">Priority Barriers identified in Exploration:</h4>
+                        <div class="space-y-2">
+                            <template x-for="b in topBarriers" :key="b.id">
+                                <div class="flex items-start gap-2 text-sm">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5"></span>
+                                    <span class="font-bold text-slate-800" x-text="b.desc"></span>
+                                    <span class="text-slate-400 text-xs" x-text="'(' + b.construct + ')'"></span>
+                                </div>
+                            </template>
+                            <div x-show="topBarriers.length === 0" class="text-xs text-slate-400">No high-priority barriers identified in matrix.</div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-lg border border-slate-100 text-center">
+                        <div class="text-xs font-bold text-slate-400 uppercase mb-1">Readiness Score</div>
+                        <div class="text-4xl font-black text-msk-blue mb-2" x-text="readinessScore + '%'"></div>
+                        <div class="text-[10px] text-slate-500">Based on AIM, IAM, FIM & Self-Efficacy</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section 2: Implementation Strategies -->
+            <div class="mb-10 page-break">
+                <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">2. The Solution (Implementation Strategies)</h3>
+                <p class="text-xs text-slate-500 mb-4">Selected ERIC strategies to address identified determinants.</p>
+                <div class="grid grid-cols-2 gap-4">
+                    <template x-for="s in project.strategies" :key="s.name">
+                        <div class="border border-slate-200 rounded p-3 bg-white shadow-sm flex items-center gap-3">
+                            <div class="w-8 h-8 rounded bg-blue-50 text-msk-blue flex items-center justify-center font-bold text-xs">S</div>
+                            <span class="text-sm font-bold text-slate-700" x-text="s.name"></span>
+                        </div>
+                    </template>
+                     <div x-show="project.strategies.length === 0" class="text-sm text-slate-400 italic">No strategies selected.</div>
+                </div>
+            </div>
+
+            <!-- Section 3: Fidelity Protocol -->
+            <div class="mb-10">
+                <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">3. The Protocol (Core Components)</h3>
+                <table class="w-full text-left text-sm border-collapse">
+                    <thead>
+                        <tr class="bg-slate-100 border-b border-slate-200 text-slate-600 text-xs uppercase">
+                            <th class="p-3 font-bold">Component</th>
+                            <th class="p-3 font-bold">Function</th>
+                            <th class="p-3 font-bold">Measurement</th>
+                            <th class="p-3 font-bold">Target</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <template x-for="comp in project.coreComponents" :key="comp.name">
+                            <tr>
+                                <td class="p-3 font-bold text-slate-800" x-text="comp.name"></td>
+                                <td class="p-3 text-slate-600" x-text="comp.func"></td>
+                                <td class="p-3 text-slate-600" x-text="comp.measurement"></td>
+                                <td class="p-3 font-bold text-emerald-600" x-text="comp.threshold"></td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Section 4: Outcomes -->
+            <div>
+                 <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider mb-4 border-b border-slate-200 pb-2">4. Targeted Outcomes</h3>
+                 <div class="grid grid-cols-3 gap-6">
+                     <div class="bg-emerald-50 border border-emerald-100 p-4 rounded-lg">
+                         <h4 class="font-bold text-emerald-800 text-xs uppercase mb-2">Implementation</h4>
+                         <ul class="list-disc list-inside text-xs text-slate-700 space-y-1">
+                             <li>Protocol Fidelity > 80%</li>
+                             <li>Staff Adoption Rate</li>
+                             <li>Cost Neutrality</li>
+                         </ul>
+                     </div>
+                     <div class="bg-msk-light border border-blue-100 p-4 rounded-lg">
+                         <h4 class="font-bold text-msk-darkblue text-xs uppercase mb-2">Service</h4>
+                         <ul class="list-disc list-inside text-xs text-slate-700 space-y-1">
+                             <li>Efficiency (Throughput)</li>
+                             <li>Patient Safety</li>
+                             <li>Equity of Delivery</li>
+                         </ul>
+                     </div>
+                     <div class="bg-indigo-50 border border-indigo-100 p-4 rounded-lg">
+                         <h4 class="font-bold text-indigo-800 text-xs uppercase mb-2">Client/Patient</h4>
+                         <ul class="list-disc list-inside text-xs text-slate-700 space-y-1">
+                             <li>Reduced Returns to ED</li>
+                             <li>Patient Satisfaction</li>
+                             <li>Functional Status</li>
+                         </ul>
+                     </div>
+                 </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODALS -->
+    <!-- Strategy Detail Modal -->
+    <div x-show="showStrategyModal" x-transition.opacity class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" @click.self="showStrategyModal = false">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center">
+                <h2 class="text-lg font-bold text-msk-navy" x-text="currentStrategy"></h2>
+                <button @click="showStrategyModal = false" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div class="p-6">
+                 <p class="text-sm text-slate-600 leading-relaxed" x-text="currentStrategyDesc"></p>
+                 <button @click="addStrategy(currentStrategy); showStrategyModal = false" class="w-full mt-6 bg-msk-blue text-white font-bold py-2.5 rounded-lg hover:bg-msk-darkblue">Add to Plan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fidelity Plan Modal -->
+    <div x-show="showFidelityModal" x-transition.opacity class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" @click.self="showFidelityModal = false">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
+            <div class="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h2 class="text-lg font-bold text-slate-800">Edit Fidelity Plan</h2>
+                <button @click="showFidelityModal = false" class="text-slate-400 hover:text-slate-600 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto bg-slate-50/50 flex-1 space-y-4">
+                <template x-for="(comp, index) in project.coreComponents" :key="index">
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative group">
+                        <button @click="removeCoreComponent(index)" class="absolute top-3 right-3 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
+                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                        <h4 class="text-xs font-bold text-msk-blue mb-4 uppercase tracking-wider">Component <span x-text="index+1"></span></h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-4">
+                            <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Name</label><input type="text" x-model="comp.name" class="block w-full rounded-md border-slate-300 text-sm focus:border-msk-blue focus:ring-msk-blue py-1.5"></div>
+                            <div><label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Function</label><input type="text" x-model="comp.func" class="block w-full rounded-md border-slate-300 text-sm focus:border-msk-blue focus:ring-msk-blue py-1.5"></div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Dimension</label><select x-model="comp.dimension" class="block w-full rounded-md border-slate-300 text-xs focus:border-msk-blue focus:ring-msk-blue py-1.5"><option value="Adherence">Adherence</option><option value="Dose">Dose</option><option value="Quality">Quality</option></select></div>
+                            <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Method</label><input type="text" x-model="comp.measurement" class="block w-full rounded-md border-slate-300 text-xs focus:border-msk-blue focus:ring-msk-blue py-1.5"></div>
+                            <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Threshold</label><input type="text" x-model="comp.threshold" class="block w-full rounded-md border-slate-300 text-xs focus:border-msk-blue focus:ring-msk-blue py-1.5"></div>
+                        </div>
+                    </div>
+                </template>
+                <button @click="addCoreComponent" class="w-full border-2 border-dashed border-slate-300 text-slate-400 font-bold py-3 rounded-xl hover:border-msk-blue hover:text-msk-blue transition-colors bg-white">+ Add Custom Component</button>
+            </div>
+            <div class="p-4 border-t border-slate-100 bg-white flex justify-end">
+                <button @click="showFidelityModal = false" class="bg-msk-blue text-white px-6 py-2 rounded-lg font-bold text-sm shadow-sm hover:bg-msk-darkblue transition-colors">Done</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Adaptation Modal (Compact) -->
+    <div x-show="showAdaptationModal" x-transition.opacity class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" @click.self="showAdaptationModal = false">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100">
+            <div class="p-5 border-b border-slate-100">
+                <h2 class="text-lg font-bold text-slate-800">Log Adaptation</h2>
+            </div>
+            <div class="p-6 space-y-4">
+                 <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Date</label><input type="date" x-model="newAdaptation.date" class="block w-full rounded-md border-slate-300 text-sm py-2"></div>
+                 <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">What Changed?</label><select x-model="newAdaptation.what" class="block w-full rounded-md border-slate-300 text-sm py-2"><option value="">Select...</option><option value="Content">Intervention Content</option><option value="Context">Context / Delivery</option><option value="Training">Training / Evaluation</option></select></div>
+                 <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Nature</label><select x-model="newAdaptation.nature" class="block w-full rounded-md border-slate-300 text-sm py-2"><option value="Tailoring">Tailoring/Tweaking</option><option value="Adding">Adding Elements</option><option value="Removing">Removing/Skipping</option></select></div>
+                 <div><label class="block text-xs font-bold text-slate-500 uppercase mb-1">Reason</label><textarea x-model="newAdaptation.reason" class="block w-full rounded-md border-slate-300 text-sm py-2" rows="2"></textarea></div>
+                 <button @click="saveAdaptation" class="w-full bg-msk-blue text-white font-bold py-2.5 rounded-lg hover:bg-msk-darkblue mt-2">Save Record</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Session Log Modal (Compact) -->
+    <div x-show="showSessionLogModal" x-transition.opacity class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-center items-center p-4" @click.self="showSessionLogModal = false">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-y-auto" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100">
+            <div class="p-5 border-b border-slate-100"><h2 class="text-lg font-bold text-slate-800">Session Log</h2></div>
+            <div class="p-5 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Date</label><input type="date" x-model="newSession.date" class="block w-full rounded-md border-slate-300 text-xs"></div>
+                    <div><label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Observer</label><input type="text" x-model="newSession.observer" class="block w-full rounded-md border-slate-300 text-xs"></div>
+                </div>
+                <div class="border-t border-slate-100 pt-4 space-y-3">
+                    <template x-for="comp in project.coreComponents" :key="comp.name">
+                        <div class="p-3 bg-slate-50 rounded border border-slate-100">
+                            <div class="flex justify-between items-start mb-2">
+                                <div class="text-xs font-bold text-slate-700" x-text="comp.name"></div>
+                                <div class="text-[10px] text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
+                                    Target: <span class="font-mono text-msk-blue font-bold" x-text="comp.threshold"></span>
+                                </div>
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[9px] font-bold text-slate-400 uppercase mb-1" x-text="comp.measurement || 'Observed Value'"></label>
+                                    <input type="text" class="block w-full rounded-md border-slate-300 text-xs py-1.5 focus:border-msk-blue focus:ring-msk-blue" 
+                                           x-model="newSession.observed[comp.name]" placeholder="Enter data...">
+                                </div>
+                                <div>
+                                    <label class="block text-[9px] font-bold text-slate-400 uppercase mb-1">Rating (1-5)</label>
+                                    <input type="number" min="1" max="5" class="block w-full text-center rounded-md border-slate-300 text-xs py-1.5 focus:border-msk-blue focus:ring-msk-blue" 
+                                           x-model="newSession.ratings[comp.name + '_adherence']">
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+                <button @click="saveSessionLog" class="w-full bg-emerald-600 text-white font-bold py-2 rounded-lg hover:bg-emerald-700">Save Session</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPTS MOVED TO END OF BODY FOR RELIABILITY -->
+    <script>
+        // Define Alpine Data Component FIRST
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('impSciApp', () => ({
+                currentPhase: 'exploration',
+                showFidelityModal: false, 
+                showSessionLogModal: false, 
+                showAdaptationModal: false,
+                showStrategyModal: false,
+                currentStrategy: '',
+                currentStrategyDesc: '',
+                psatChart: null, 
+                psatAssessor: '',
+                resizeTimeout: null,
+
+                // Data Persistence - NOW PRE-FILLED WITH HYPOTHETICAL DATA
+                project: Alpine.$persist({
+                    name: 'Metro General Hospital ED',
+                    description: 'Metro General is a high-volume (85k visits/yr) Level 1 Trauma center in an urban setting. We face significant overcrowding (14% LWBS) and boarding issues. 22% of our volume is geriatric (>65). Key challenges include limited social work coverage on nights/weekends, high nursing turnover (18%), and a fragmented discharge process for vulnerable elders.',
+                    arms: ['ECR', 'NLTC'], 
+                    coreComponents: [
+                        { name: 'Identification', func: 'Automated EHR Flag', measurement: 'Screening Rate', threshold: '>80%', dimension: 'Adherence' },
+                        { name: 'Assessment', func: 'Dyadic Needs Assessment', measurement: 'Charts Reviewed', threshold: '>70%', dimension: 'Quality' },
+                        { name: 'Care Plan', func: 'Tailored 4Ms Plan', measurement: 'Order Sets Used', threshold: '>60%', dimension: 'Dose' },
+                        { name: 'Telephonic Follow-up', func: 'Check Status 24-72h', measurement: 'Call Rate', threshold: '>85%', dimension: 'Dose' }
+                    ], 
+                    team: [
+                        { name: 'Dr. Sarah Chen', role: 'Site PI / Physician Champion' },
+                        { name: 'Mark Miller, RN', role: 'Nurse Manager' },
+                        { name: 'Elena Rodriguez, MSW', role: 'Social Work Lead' },
+                        { name: 'David Kim', role: 'Data Analyst' }
+                    ], 
+                    timeline: [
+                        { date: '2023-09-01', desc: 'Kickoff Meeting' },
+                        { date: '2023-10-15', desc: 'Staff Training (Didactic)' },
+                        { date: '2023-11-01', desc: 'Go-Live Date' },
+                        { date: '2024-02-01', desc: 'First Quarterly Review' }
+                    ],
+                    aim: 4.5, iam: 4.0, fim: 2.5, selfEfficacyEBP: 3.0, selfEfficacyResearch: 2.0, 
+                    determinants: [
+                         { id: 1, desc: 'EHR Fatigue/Usability', construct: 'resources', rating: -2, importance: 90, changeability: 20 },
+                         { id: 2, desc: 'Geriatric Recidivism (Motivation)', construct: 'needs', rating: 2, importance: 85, changeability: 60 },
+                         { id: 3, desc: 'High Nursing Turnover', construct: 'readiness', rating: -2, importance: 95, changeability: 30 },
+                         { id: 4, desc: 'Staff Belief in 4Ms Model', construct: 'culture', rating: 1, importance: 70, changeability: 80 },
+                         { id: 5, desc: 'Lack of Geriatric Knowledge', construct: 'knowledge', rating: -1, importance: 60, changeability: 90 }
+                    ], 
+                    strategies: [
+                        { name: 'Identify Champions' },
+                        { name: 'Change Physical Structure' },
+                        { name: 'Audit and Feedback' },
+                        { name: 'Make Training Dynamic' },
+                        { name: 'Educational Meetings' }
+                    ], 
+                    adaptations: [
+                        { id: 1698745612345, date: '2023-11-15', what: 'Content', nature: 'Tailoring', reason: 'Shortened the initial assessment form from 10 questions to 5 due to nurse complaints about time burden during triage.', who: 'Mark Miller' },
+                        { id: 1699945612345, date: '2023-12-01', what: 'Context', nature: 'Adding', reason: 'Added a visual cue (magnet) to patient doors for high-risk geriatric patients to improve identification by float staff.', who: 'Dr. Chen' }
+                    ],
+                    psatScores: { environmental: 4, funding: 2, partnerships: 5, orgCapacity: 4, programEval: 6, programAdapt: 5, communications: 3, strategicPlan: 3 }, 
+                    psatHistory: [
+                        { date: '2023-08-15', assessor: 'Dr. Chen', average: '3.2' },
+                        { date: '2023-12-15', assessor: 'Mark Miller', average: '4.0' }
+                    ],
+                    fidelityLog: {}, 
+                    fidelityHistory: [
+                         { id: 1, date: '2023-11-05', observer: 'David Kim', avgScore: '3.5', observed: { 'Identification': '72%', 'Assessment': '65%', 'Care Plan': '40%', 'Telephonic Follow-up': '70%' }, details: { 'Identification_adherence': 4, 'Assessment_adherence': 3, 'Care Plan_adherence': 3, 'Telephonic Follow-up_adherence': 4 } },
+                         { id: 2, date: '2023-11-20', observer: 'David Kim', avgScore: '4.0', observed: { 'Identification': '78%', 'Assessment': '68%', 'Care Plan': '55%', 'Telephonic Follow-up': '80%' }, details: { 'Identification_adherence': 5, 'Assessment_adherence': 4, 'Care Plan_adherence': 3, 'Telephonic Follow-up_adherence': 4 } },
+                         { id: 3, date: '2023-12-10', observer: 'David Kim', avgScore: '4.5', observed: { 'Identification': '85%', 'Assessment': '75%', 'Care Plan': '62%', 'Telephonic Follow-up': '88%' }, details: { 'Identification_adherence': 5, 'Assessment_adherence': 5, 'Care Plan_adherence': 4, 'Telephonic Follow-up_adherence': 4 } }
+                    ]
+                }).as('impsci-edlead-filled-demo-v1'),
+
+                // Temporary State
+                newBarrier: { id: null, desc: '', construct: '', rating: -2, importance: 50, changeability: 50 },
+                newSession: { date: new Date().toISOString().split('T')[0], observer: '', ratings: {}, observed: {} },
+                newAdaptation: { date: new Date().toISOString().split('T')[0], what: '', nature: 'Tailoring', reason: '', who: '' },
+
+                // Constants
+                readinessMetrics: [
+                    { id: 1, label: 'Do we want to do this?', model: 'aim', help: 'Acceptability (AIM)' },
+                    { id: 2, label: 'Does it fit our setting?', model: 'iam', help: 'Appropriateness (IAM)' },
+                    { id: 3, label: 'Can we do it?', model: 'fim', help: 'Feasibility (FIM)' },
+                    { id: 4, label: 'Do we have the skills?', model: 'selfEfficacyEBP', help: 'Clinical Self-Efficacy' },
+                    { id: 5, label: 'Can we evaluate it?', model: 'selfEfficacyResearch', help: 'Research Self-Efficacy' }
+                ],
+                armData: {
+                    'ECR': [
+                        { name: 'Identification', func: 'Automated EHR Flag', measurement: 'Screening Rate', threshold: '>80%', dimension: 'Adherence' },
+                        { name: 'Assessment', func: 'Dyadic Needs Assessment', measurement: 'Charts Reviewed', threshold: '>70%', dimension: 'Quality' },
+                        { name: 'Care Plan', func: 'Tailored 4Ms Plan', measurement: 'Order Sets Used', threshold: '>60%', dimension: 'Dose' }
+                    ],
+                    'CPTI': [ { name: 'Home Visit', func: 'Safety Eval within 24h', measurement: 'Visit Completion', threshold: '>90%', dimension: 'Adherence' } ],
+                    'NLTC': [ { name: 'Telephonic Follow-up', func: 'Check Status 24-72h', measurement: 'Call Rate', threshold: '>85%', dimension: 'Dose' } ]
+                },
+                availableArms: [
+                    { id: 'ECR', label: 'Emergency Care Redesign' },
+                    { id: 'CPTI', label: 'Community Paramedicine' },
+                    { id: 'NLTC', label: 'Telephonic Care' }
+                ],
+                phases: [ 
+                    { id: 'exploration', label: 'Exploration' }, 
+                    { id: 'preparation', label: 'Preparation' }, 
+                    { id: 'implementation', label: 'Implementation' }, 
+                    { id: 'sustainment', label: 'Sustainment' }, 
+                    { id: 'dashboard', label: 'Blueprint' } 
+                ],
+                // PSAT Questions Mapping
+                psatQuestions: {
+                    environmental: "Does the political and community environment support the program?",
+                    funding: "Is there stable, long-term funding secured?",
+                    partnerships: "Are there strong connections with key stakeholders?",
+                    orgCapacity: "Does the site have sufficient staff and leadership support?",
+                    programEval: "Is data collected and used to improve the program?",
+                    programAdapt: "Is the program modified periodically to fit the context?",
+                    communications: "Is the value of the program communicated to others?",
+                    strategicPlan: "Is there a long-term strategic plan in place?"
+                },
+                // Mapping CFIR Domains to ERIC Strategies
+                cfirToEric: {
+                    'culture': ['Assess Readiness', 'Build Coalition', 'Conduct Local Consensus Discussions', 'Identify Champions', 'Promote Network Weaving'],
+                    'readiness': ['Assess Readiness', 'Audit and Feedback', 'Mandate Change', 'Develop Academic Partnerships'],
+                    'resources': ['Access New Funding', 'Change Physical Structure', 'Alter Incentive/Allowance Structures', 'Make Training Dynamic'],
+                    'needs': ['Involve Patients/Consumers', 'Intervene with Patients', 'Prepare Patients/Consumers', 'Use Mass Media'],
+                    'policy': ['Change Liability Laws', 'Create New Clinical Teams', 'Alter Incentive/Allowance Structures', 'Change Accreditation'],
+                    'knowledge': ['Conduct Educational Meetings', 'Distribute Educational Materials', 'Educational Outreach Visits', 'Train-the-Trainer'],
+                    'efficacy': ['Make Training Dynamic', 'Shadowing Other Experts', 'Ongoing Consultation', 'Modeling']
+                },
+                // Strategy Dictionary
+                strategyDefinitions: {
+                    'Assess Readiness': 'Assess various aspects of the organization to determine its preparedness to implement the innovation.',
+                    'Build Coalition': 'Recruit and cultivate relationships with partners to gain support.',
+                    'Conduct Local Consensus Discussions': 'Include local providers and other stakeholders in discussions that address whether the chosen problem is important.',
+                    'Identify Champions': 'Identify and prepare individuals who dedicate themselves to supporting the implementation.',
+                    'Promote Network Weaving': 'Identify and build on existing high-quality working relationships.',
+                    'Audit and Feedback': 'Collect and summarize clinical performance data over a specified time period and give it to clinicians.',
+                    'Mandate Change': 'Have leadership declare that the innovation must be used.',
+                    'Develop Academic Partnerships': 'Partner with a university or academic institution for shared training or resources.',
+                    'Access New Funding': 'Access new or existing money to facilitate implementation.',
+                    'Change Physical Structure': 'Change the physical structure or equipment (e.g., layout, lighting) of the setting.',
+                    'Alter Incentive/Allowance Structures': 'Work to incentivize the adoption and implementation of the innovation.',
+                    'Make Training Dynamic': 'Vary the methods of information delivery to accommodate different learning styles.',
+                    'Involve Patients/Consumers': 'Engage patients/consumers in the implementation effort.',
+                    'Intervene with Patients': 'Strategies specifically designed to interact with patients to increase adherence.',
+                    'Prepare Patients/Consumers': 'Strategies to increase patient/consumer knowledge or ability to participate.',
+                    'Use Mass Media': 'Use media (e.g., newspapers, radio, TV) to spread the word about the innovation.',
+                    'Change Liability Laws': ' participate in liability reform efforts.',
+                    'Create New Clinical Teams': 'Change who serves on the clinical team or create a new team.',
+                    'Change Accreditation': 'Work to alter accreditation standards.',
+                    'Conduct Educational Meetings': 'Hold meetings targeted toward different stakeholder groups to teach them about the innovation.',
+                    'Distribute Educational Materials': 'Distribute pamphlets, videos, or other materials.',
+                    'Educational Outreach Visits': 'Use a trained person to meet with providers in their practice settings.',
+                    'Train-the-Trainer': 'Train designated individuals to train others.',
+                    'Shadowing Other Experts': 'Provide opportunities for staff to observe experts.',
+                    'Ongoing Consultation': 'Provide ongoing support and coaching.',
+                    'Modeling': 'Demonstrate the correct use of the innovation.',
+                    'Tailor Strategies': 'Tailor the implementation strategies to address specific barriers.',
+                    'Promote Adaptability': 'Identify the ways the innovation can be tailored to meet local needs.'
+                },
+
+                init() {
+                    if (!this.project) this.project = {};
+                    
+                    // Watchers
+                    this.$watch('currentPhase', (val) => {
+                        // Cleanup charts when leaving tabs to prevent resize/update errors on hidden canvases
+                        if (val !== 'sustainment' && this.psatChart) {
+                            this.psatChart.destroy();
+                            this.psatChart = null;
+                        }
+
+                        // Short delay to allow DOM to update (x-show transition)
+                        setTimeout(() => {
+                            if (val === 'preparation') this.renderBarrierPlot();
+                            if (val === 'sustainment') this.renderPsatChart();
+                        }, 250);
+                    });
+                    
+                    // Debounced Resize Observer
+                    window.addEventListener('resize', () => {
+                        clearTimeout(this.resizeTimeout);
+                        this.resizeTimeout = setTimeout(() => {
+                            if (this.currentPhase === 'preparation') this.renderBarrierPlot();
+                        }, 100);
+                    });
+                },
+
+                // --- Logic Methods ---
+                closeAllModals() { 
+                    this.showFidelityModal = false; 
+                    this.showSessionLogModal = false; 
+                    this.showAdaptationModal = false; 
+                    this.showStrategyModal = false;
+                },
+                
+                showStrategyDesc(name) {
+                    this.currentStrategy = name;
+                    this.currentStrategyDesc = this.strategyDefinitions[name] || 'No description available for this strategy.';
+                    this.showStrategyModal = true;
+                },
+
+                updateCoreComponentsFromArms() {
+                    let newComps = [];
+                    // Only populate if project.arms has values
+                    if (this.project.arms && this.project.arms.length > 0) {
+                        this.project.arms.forEach(arm => { 
+                            if(this.armData[arm]) {
+                                newComps = [...newComps, ...this.armData[arm]]; 
+                            }
+                        });
+                        // Update if empty or reset requested (simplified for better UX)
+                        if(this.project.coreComponents.length === 0 || newComps.length > 0) {
+                             // Use JSON parse/stringify to deep copy and avoid reference issues
+                             this.project.coreComponents = JSON.parse(JSON.stringify(newComps));
+                        }
+                    } else {
+                        // If no arms selected, clear components (optional, but cleaner)
+                        this.project.coreComponents = [];
+                    }
+                },
+                
+                addCoreComponent() { this.project.coreComponents.push({ name: 'New Component', func: '', measurement: '', threshold: '', dimension: 'Adherence' }); },
+                removeCoreComponent(index) { this.project.coreComponents.splice(index, 1); },
+                
+                addTeamMember() { this.project.team.push({ name: '', role: '' }); },
+                removeTeamMember(index) { this.project.team.splice(index, 1); },
+                
+                addTimelineItem() { this.project.timeline.push({ date: '', desc: '' }); },
+                removeTimelineItem(index) { this.project.timeline.splice(index, 1); },
+                
+                addBarrier() {
+                    if(!this.newBarrier.desc || !this.newBarrier.construct) return;
+                    this.project.determinants.push({ ...this.newBarrier, id: Date.now() });
+                    // Clear description but maybe keep domains for workflow? No, reset for fresh start.
+                    this.newBarrier.desc = '';
+                    this.renderBarrierPlot();
+                },
+                removeBarrier(index) { 
+                    this.project.determinants.splice(index, 1); 
+                    this.renderBarrierPlot(); 
+                },
+                highlightBarrier(id) {
+                      const svg = d3.select("#barrier-matrix svg");
+                      svg.selectAll(".node circle, .node path").attr("stroke", "white").attr("stroke-width", 1.5);
+                      svg.selectAll(".node").filter(d => d.id === id).select("circle, path").transition().duration(200).attr("stroke", "#1E293B").attr("stroke-width", 3);
+                },
+
+                addStrategy(name) { 
+                    if (name && !this.project.strategies.find(s=>s.name===name)) {
+                        this.project.strategies.push({ name }); 
+                    }
+                },
+                removeStrategy(index) { this.project.strategies.splice(index, 1); },
+
+                // Fidelity
+                updateFidelity(name, score) { 
+                    if(!this.project.fidelityLog) this.project.fidelityLog = {}; 
+                    if(!this.project.fidelityLog[name]) this.project.fidelityLog[name] = {}; 
+                    this.project.fidelityLog[name].adherence = score; 
+                },
+                logFidelitySession() {
+                    this.showSessionLogModal = true;
+                    this.newSession.ratings = {};
+                    this.newSession.observed = {};
+                    this.project.coreComponents.forEach(c => {
+                        this.newSession.ratings[c.name + '_adherence'] = 3;
+                        this.newSession.observed[c.name] = ''; 
+                    });
+                },
+                saveSessionLog() {
+                    if(!this.project.fidelityHistory) this.project.fidelityHistory = [];
+                    const vals = Object.values(this.newSession.ratings).map(Number);
+                    const avg = vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1) : 0;
+                    this.project.fidelityHistory.unshift({ 
+                        id: Date.now(), 
+                        date: this.newSession.date, 
+                        observer: this.newSession.observer, 
+                        avgScore: avg, 
+                        details: {...this.newSession.ratings},
+                        observed: {...this.newSession.observed}
+                    });
+                    this.showSessionLogModal = false;
+                },
+                getLatestCompScore(compName) {
+                    if(!this.project.fidelityHistory || this.project.fidelityHistory.length === 0) return 0;
+                    const latest = this.project.fidelityHistory[0];
+                    return latest.details ? (latest.details[compName + '_adherence'] || 0) : 0;
+                },
+                getLatestObserved(compName) {
+                     if(!this.project.fidelityHistory || this.project.fidelityHistory.length === 0) return 'N/A';
+                     const latest = this.project.fidelityHistory[0];
+                     return latest.observed ? (latest.observed[compName] || 'N/A') : 'N/A';
+                },
+
+                // Adaptations
+                saveAdaptation() {
+                    if(!this.project.adaptations) this.project.adaptations = [];
+                    this.project.adaptations.unshift({ id: Date.now(), ...this.newAdaptation });
+                    this.newAdaptation = { date: new Date().toISOString().split('T')[0], what: '', nature: 'Tailoring', reason: '', who: '' };
+                    this.showAdaptationModal = false;
+                },
+
+                // PSAT
+                logPsatAssessment() {
+                    if(!this.psatAssessor) return;
+                    if(!this.project.psatHistory) this.project.psatHistory = [];
+                    this.project.psatHistory.unshift({ date: new Date().toLocaleDateString(), assessor: this.psatAssessor, average: this.psatAverage });
+                    this.psatAssessor = '';
+                },
+
+                // --- Getters ---
+                get readinessScore() { 
+                    const total = (Number(this.project.aim)+Number(this.project.iam)+Number(this.project.fim)+Number(this.project.selfEfficacyEBP)+Number(this.project.selfEfficacyResearch));
+                    if (total === 0) return 0;
+                    return Math.round((total/25)*100); 
+                },
+                get readinessColorClass() { 
+                    const s = this.readinessScore;
+                    if(s === 0) return 'text-slate-300';
+                    if(s < 40) return 'text-red-500'; if(s < 70) return 'text-amber-400'; return 'text-emerald-500';
+                },
+                get progress() { return Math.min(100, (this.project.name ? 10 : 0) + (this.project.coreComponents.length > 0 ? 30 : 0) + (this.project.determinants.length > 0 ? 30 : 0) + (this.project.strategies.length > 0 ? 30 : 0)); },
+                get sortedDeterminants() { return [...this.project.determinants].sort((a, b) => parseInt(a.rating) - parseInt(b.rating)); },
+                get topBarriers() { return this.project.determinants.filter(d => parseInt(d.rating) < 0).sort((a,b) => b.importance - a.importance).slice(0,3); },
+                get psatAverage() { const s = Object.values(this.project.psatScores).map(Number); return (s.reduce((a,b)=>a+b,0)/s.length).toFixed(1); },
+                get innerFactors() { return this.project.determinants.filter(d => ['culture','readiness','resources','knowledge'].includes(d.construct)); },
+                get outerFactors() { return this.project.determinants.filter(d => ['needs','policy'].includes(d.construct)); },
+                
+                // NEW: Suggested Strategies based on CFIR-ERIC match
+                get suggestedStrategies() {
+                    const activeConstructs = [...new Set(this.project.determinants.map(d => d.construct))];
+                    let suggestions = [];
+                    activeConstructs.forEach(c => {
+                        if(this.cfirToEric[c]) {
+                            suggestions = [...suggestions, ...this.cfirToEric[c]];
+                        }
+                    });
+                    // Filter out already selected ones
+                    const currentNames = this.project.strategies.map(s => s.name);
+                    return [...new Set(suggestions)].filter(s => !currentNames.includes(s));
+                },
+
+                isPhaseComplete(id) { 
+                    if(id === 'exploration') return this.project.coreComponents.length > 0;
+                    if(id === 'preparation') return this.project.strategies.length > 0;
+                    if(id === 'implementation') return this.project.adaptations.length > 0;
+                    return false;
+                },
+                formatDomain(d) { return { environmental: "Env. Support", funding: "Funding", partnerships: "Partnerships", orgCapacity: "Org. Capacity", programEval: "Evaluation", programAdapt: "Adaptation", communications: "Comms", strategicPlan: "Strat. Planning" }[d] || d; },
+
+                downloadJSON() {
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.project));
+                    const el = document.createElement('a');
+                    el.setAttribute("href", dataStr);
+                    el.setAttribute("download", "impsci_plan.json");
+                    document.body.appendChild(el);
+                    el.click();
+                    el.remove();
+                },
+
+                // --- D3 Visualization ---
+                renderBarrierPlot() {
+                    const container = document.getElementById('barrier-matrix');
+                    if (!container) return;
+                    container.innerHTML = '';
+                    
+                    // Add relative positioning for tooltip context
+                    d3.select(container).style("position", "relative");
+
+                    // Add Tooltip
+                    const tooltip = d3.select(container).append("div")
+                        .attr("class", "absolute z-50 hidden bg-slate-800 text-white text-[10px] rounded p-2 shadow-lg pointer-events-none transition-opacity duration-200")
+                        .style("opacity", 0)
+                        .style("line-height", "1.4");
+
+                    const width = container.clientWidth;
+                    const height = container.clientHeight || 500;
+                    const margin = {top: 20, right: 20, bottom: 40, left: 40};
+                    const svg = d3.select(container).append("svg").attr("width", "100%").attr("height", "100%").attr("viewBox", `0 0 ${width} ${height}`).append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+                    
+                    const w = width - margin.left - margin.right;
+                    const h = height - margin.top - margin.bottom;
+
+                    const x = d3.scaleLinear().domain([0, 100]).range([0, w]);
+                    const y = d3.scaleLinear().domain([0, 100]).range([h, 0]);
+
+                    // Background Quadrants
+                    const midX = x(50), midY = y(50);
+                    const quads = [
+                        {x: midX, y: 0, w: w-midX, h: midY, l: "High Priority", c: "#10B981"}, 
+                        {x: 0, y: 0, w: midX, h: midY, l: "Strategic", c: "#F59E0B"}, 
+                        {x: 0, y: midY, w: midX, h: h-midY, l: "Monitor", c: "#64748B"}, 
+                        {x: midX, y: midY, w: w-midX, h: h-midY, l: "Innovation", c: "#3B82F6"}
+                    ];
+                    
+                    quads.forEach(q => {
+                        svg.append("rect").attr("x", q.x).attr("y", q.y).attr("width", q.w).attr("height", q.h).attr("fill", q.c).attr("opacity", 0.05);
+                        svg.append("text").attr("x", q.x + q.w - 10).attr("y", q.y + 20).text(q.l).attr("text-anchor", "end").attr("fill", q.c).style("font-weight", "bold").style("font-size", "10px").style("text-transform", "uppercase");
+                    });
+
+                    // Axes
+                    svg.append("g").attr("transform", `translate(0,${h})`).call(d3.axisBottom(x).ticks(5).tickSize(-h).tickPadding(10)).attr("color", "#CBD5E1").select(".domain").remove();
+                    svg.append("g").call(d3.axisLeft(y).ticks(5).tickSize(-w).tickPadding(10)).attr("color", "#CBD5E1").select(".domain").remove();
+
+                    // Labels
+                    svg.append("text").attr("x", w/2).attr("y", h+35).text("Importance →").attr("text-anchor", "middle").style("font-size", "11px").style("font-weight", "bold").style("fill", "#64748B");
+                    svg.append("text").attr("transform", "rotate(-90)").attr("y", -30).attr("x", -h/2).text("Changeability →").attr("text-anchor", "middle").style("font-size", "11px").style("font-weight", "bold").style("fill", "#64748B");
+
+                    // Store self for access in D3 callbacks
+                    const self = this;
+
+                    // Drag Behavior
+                    const drag = d3.drag()
+                        .on("start", function(event, d) {
+                            d3.select(this).raise(); // Bring to front
+                            d3.select(this).select("path, circle").attr("stroke", "#1E293B").attr("stroke-width", 2);
+                            d3.select(this).style("cursor", "grabbing");
+                            tooltip.style("opacity", 0); // Hide tooltip while dragging
+                        })
+                        .on("drag", function(event, d) {
+                            // Calculate new values clamped to 0-100
+                            d.importance = Math.max(0, Math.min(100, x.invert(event.x)));
+                            d.changeability = Math.max(0, Math.min(100, y.invert(event.y)));
+                            
+                            // Move the specific group element
+                            d3.select(this).attr("transform", `translate(${x(d.importance)},${y(d.changeability)})`);
+                        })
+                        .on("end", function(event, d) { 
+                            d3.select(this).select("path, circle").attr("stroke", "white").attr("stroke-width", 1.5);
+                            d3.select(this).style("cursor", "grab");
+                            // Update Alpine data model
+                            self.project.determinants = [...self.project.determinants]; 
+                        });
+
+                    const nodes = svg.selectAll(".node").data(this.project.determinants).enter().append("g")
+                        .attr("class", "node")
+                        .attr("transform", d => `translate(${x(d.importance)},${y(d.changeability)})`)
+                        .style("cursor", "grab")
+                        .call(drag);
+
+                    // Add interaction events for Tooltip
+                    nodes
+                        .on("mouseover", function(event, d) {
+                            const el = d3.select(this).select("path, circle");
+                            el.transition().duration(200).attr("transform", "scale(1.2)");
+                            
+                            tooltip.style("opacity", 1).style("display", "block")
+                                .html(`<div class="font-bold border-b border-slate-600 pb-1 mb-1">${d.desc}</div>
+                                       <div class="grid grid-cols-2 gap-x-3 text-slate-300">
+                                         <span>Domain:</span><span class="text-white text-right">${d.construct}</span>
+                                         <span>Import:</span><span class="text-white text-right">${Math.round(d.importance)}</span>
+                                         <span>Change:</span><span class="text-white text-right">${Math.round(d.changeability)}</span>
+                                       </div>`);
+                        })
+                        .on("mousemove", function(event) {
+                            const [mx, my] = d3.pointer(event, container);
+                            tooltip
+                                .style("left", (mx + 15) + "px")
+                                .style("top", (my + 15) + "px");
+                        })
+                        .on("mouseout", function(event, d) {
+                            d3.select(this).select("path, circle").transition().duration(200).attr("transform", "scale(1)");
+                            tooltip.style("opacity", 0);
+                        });
+
+                    nodes.each(function(d) {
+                        const el = d3.select(this);
+                        const isBarrier = parseInt(d.rating) < 0;
+                        const color = isBarrier ? '#EF4444' : '#10B981';
+                        
+                        // NOTE: Removed native <title> to prevent double tooltip
+
+                        if(!isBarrier) {
+                            el.append("path").attr("d", d3.symbol().type(d3.symbolTriangle).size(200)).attr("fill", color).attr("stroke", "white").attr("stroke-width", 1.5).style("filter", "drop-shadow(0 2px 2px rgba(0,0,0,0.1))");
+                        } else {
+                            el.append("circle").attr("r", 8).attr("fill", color).attr("stroke", "white").attr("stroke-width", 1.5).style("filter", "drop-shadow(0 2px 2px rgba(0,0,0,0.1))");
+                        }
+                    });
+                },
+
+                // --- Chart.js ---
+                renderPsatChart() {
+                    const canvas = document.getElementById('psatRadarChart');
+                    if (!canvas) return;
+                    
+                    // Check if chart instance exists on this canvas
+                    const existingChart = Chart.getChart(canvas);
+                    
+                    // Data to render
+                    const dataValues = Object.values(this.project.psatScores);
+                    
+                    if (existingChart) {
+                        // Just update data
+                        existingChart.data.datasets[0].data = dataValues;
+                        existingChart.update();
+                        this.psatChart = existingChart; // Ensure local ref is synced
+                    } else {
+                        // Create new
+                        this.psatChart = new Chart(canvas, {
+                            type: 'radar',
+                            data: {
+                                labels: Object.keys(this.project.psatScores).map(this.formatDomain),
+                                datasets: [{
+                                    label: 'Capacity',
+                                    data: dataValues,
+                                    backgroundColor: 'rgba(0, 124, 186, 0.2)',
+                                    borderColor: '#007CBA',
+                                    borderWidth: 2,
+                                    pointBackgroundColor: '#007CBA',
+                                    pointRadius: 3
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                scales: {
+                                    r: {
+                                        min: 0, max: 7,
+                                        ticks: { stepSize: 1, display: false },
+                                        grid: { color: '#E2E8F0' },
+                                        pointLabels: { font: { size: 10, family: 'Inter', weight: 'bold' }, color: '#64748B' }
+                                    }
+                                },
+                                plugins: { legend: { display: false } }
+                            }
+                        });
+                    }
+                }
+            }))
+        })
+    </script>
+    
+    <!-- Alpine Plugins & Core (Loaded Last, No Defer) -->
+    <script src="https://cdn.jsdelivr.net/npm/@alpinejs/persist@3.14.8/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+</body>
+</html>
